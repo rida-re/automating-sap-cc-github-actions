@@ -1,9 +1,10 @@
 #!/bin/bash
 
-create_deployment_output=$(curl -K "./.github/curl-config.txt" \
-  -X POST "https://portalapi.commerce.ondemand.com/v2/subscriptions/$SUBSCRIPTION_CODE/deployments" \
+API_URL="${API_BASE_URL:-https://portalapi.commerce.ondemand.com}"
+
+create_deployment_output=$(curl -s -X POST "$API_URL/v2/subscriptions/$SUBSCRIPTION_CODE/deployments" \
   --header "Authorization: Bearer $API_TOKEN" \
-  --data "{\"buildCode\":\"$1\",\"databaseUpdateMode\":\"UPDATE\", \"environmentCode\": \"$2\", \"strategy\": \"ROLLING_UPDATE\"}")
+  --data "{\"buildCode\":\"$1\",\"databaseUpdateMode\":\"UPDATE\",\"environmentCode\":\"$2\",\"strategy\":\"ROLLING_UPDATE\"}")
 
 # Vérifie si la commande a réussi
 if [ $? -ne 0 ]; then

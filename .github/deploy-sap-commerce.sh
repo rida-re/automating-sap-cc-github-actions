@@ -22,10 +22,9 @@ status="SCHEDULED"
 while [[ $counter -lt 100 ]] && [[ "$status" == "SCHEDULED" || "$status" == "DEPLOYING" ]]; do
   let counter=counter+1 
 
-  deployment_progress_output=$(curl -K "./.github/curl-config.txt" \
-    --header "Authorization: Bearer $API_TOKEN" \
-    "https://portalapi.commerce.ondemand.com/v2/subscriptions/$SUBSCRIPTION_CODE/deployments/$code/progress")
-    
+deployment_progress_output=$(curl -s "$API_URL/v2/subscriptions/$SUBSCRIPTION_CODE/deployments/$code/progress" \
+  --header "Authorization: Bearer $API_TOKEN")
+
   if [ $? -ne 0 ]; then
     echo "$deployment_progress_output" | jq .
     exit 1

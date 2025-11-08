@@ -26,7 +26,7 @@ jobs:
         run: chmod +x ./.github/build-sap-commerce.sh
 
       - id: build_commerce
-        run: ./.github/build-sap-commerce.sh develop
+        run: ./.github/build-sap-commerce.sh main
         shell: bash
 
   deploy_commerce:

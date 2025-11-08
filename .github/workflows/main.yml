@@ -18,7 +18,7 @@ jobs:
         with:
           sparse-checkout: .github
       - id: build_commerce
-        run: ./.github/scripts/build-sap-commerce.sh develop
+        run: ./.github/build-sap-commerce.sh develop
         shell: bash
   deploy_commerce:
     needs: build_commerce
@@ -30,5 +30,5 @@ jobs:
           sparse-checkout: .github
       - env:
           BUILD_CODE: ${{needs.build_commerce.outputs.build_code}}
-        run: ./.github/scripts/deploy-sap-commerce.sh $BUILD_CODE d1
+        run: ./.github/deploy-sap-commerce.sh $BUILD_CODE d1
         shell: bash

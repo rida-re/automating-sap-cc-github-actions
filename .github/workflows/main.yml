@@ -1,34 +1,48 @@
 name: sap-commerce-ccv2-deployment
 run-name: Deploy to SAP Commerce Cloud
+
 on:
   workflow_dispatch:
   schedule:
     - cron: '0 22 * * *' # daily at 22:00
+
 env:
   API_TOKEN: ${{ secrets.CCV2_API_TOKEN }}
   SUBSCRIPTION_CODE: ${{ vars.CCV2_SUBSCRIPTION_CODE }}  
+
 jobs:
   build_commerce:
     runs-on: ubuntu-latest
     outputs:
       build_code: ${{ steps.build_commerce.outputs.build_code }}
     name: Build SAP Commerce
+
     steps:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: .github
+
+      - name: Grant execute permission for build script
+        run: chmod +x ./.github/build-sap-commerce.sh
+
       - id: build_commerce
         run: ./.github/build-sap-commerce.sh develop
         shell: bash
+
   deploy_commerce:
     needs: build_commerce
     runs-on: ubuntu-latest
     name: Deploy SAP Commerce to CCV
+
     steps:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: .github
+
+      - name: Grant execute permission for deploy script
+        run: chmod +x ./.github/deploy-sap-commerce.sh
+
       - env:
-          BUILD_CODE: ${{needs.build_commerce.outputs.build_code}}
+          BUILD_CODE: ${{ needs.build_commerce.outputs.build_code }}
         run: ./.github/deploy-sap-commerce.sh $BUILD_CODE d1
         shell: bash

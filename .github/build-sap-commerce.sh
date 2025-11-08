@@ -28,9 +28,8 @@ status="UNKNOWN"
 while [[ $counter -lt 100 ]] && [[ "$status" == "UNKNOWN" || "$status" == "BUILDING" ]]; do
   let counter=counter+1 
 
-  build_progress_output=$(curl -K "./.github/curl-config.txt" \
-    --header "Authorization: Bearer $API_TOKEN" \
-    "https://portalapi.commerce.ondemand.com/v2/subscriptions/$SUBSCRIPTION_CODE/builds/$code/progress")
+build_progress_output=$(curl -s "$API_URL/v2/subscriptions/$SUBSCRIPTION_CODE/builds/$code/progress" \
+  --header "Authorization: Bearer $API_TOKEN")
 
   if [ $? -ne 0 ]; then
     echo "$build_progress_output" | jq .

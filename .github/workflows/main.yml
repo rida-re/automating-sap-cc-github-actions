@@ -1,5 +1,5 @@
 name: sap-commerce-ccv2-deployment
-run-name: Deploy to SAP Commerce Cloud
+run-name: Mocked Deploy to SAP Commerce Cloud (CCV2)
 
 on:
   workflow_dispatch:
@@ -7,15 +7,57 @@ on:
     - cron: '0 22 * * *' # daily at 22:00
 
 env:
-  API_TOKEN: ${{ secrets.CCV2_API_TOKEN }}
-  SUBSCRIPTION_CODE: ${{ vars.CCV2_SUBSCRIPTION_CODE }}  
+  API_TOKEN: fake-token
+  SUBSCRIPTION_CODE: mock-subscription
+  API_BASE_URL: http://localhost:8080
 
 jobs:
-  build_commerce:
+  mock_sap_api:
     runs-on: ubuntu-latest
     outputs:
+      api-url: ${{ steps.start_mock.outputs.api_url }}
+    name: Start Mock SAP CCV2 API
+    steps:
+      - name: Install and start mock SAP Commerce API
+        id: start_mock
+        run: |
+          npm install -g json-server
+          
+          # Create mock API data
+          cat <<EOF > mock.json
+          {
+            "subscriptions": {
+              "mock-subscription": {
+                "builds": [],
+                "deployments": []
+              }
+            }
+          }
+          EOF
+
+          # Create mock routes for CCV2 endpoints
+          cat <<EOF > routes.json
+          {
+            "/v2/subscriptions/:subId/builds": "/builds",
+            "/v2/subscriptions/:subId/builds/:code/progress": "/builds/:code",
+            "/v2/subscriptions/:subId/deployments": "/deployments",
+            "/v2/subscriptions/:subId/deployments/:code/progress": "/deployments/:code"
+          }
+          EOF
+
+          # Start mock server in background
+          json-server --watch mock.json --routes routes.json --port 8080 &
+
+          echo "api_url=http://localhost:8080" >> $GITHUB_OUTPUT
+
+          echo "✅ Mock SAP CCV2 API running at http://localhost:8080"
+
+  build_commerce:
+    needs: mock_sap_api
+    runs-on: ubuntu-latest
+    name: Build SAP Commerce (mocked)
+    outputs:
       build_code: ${{ steps.build_commerce.outputs.build_code }}
-    name: Build SAP Commerce
 
     steps:
       - uses: actions/checkout@v4
@@ -26,13 +68,15 @@ jobs:
         run: chmod +x ./.github/build-sap-commerce.sh
 
       - id: build_commerce
+        env:
+          API_BASE_URL: ${{ needs.mock_sap_api.outputs.api-url }}
         run: ./.github/build-sap-commerce.sh main
         shell: bash
 
   deploy_commerce:
-    needs: build_commerce
+    needs: [mock_sap_api, build_commerce]
     runs-on: ubuntu-latest
-    name: Deploy SAP Commerce to CCV
+    name: Deploy SAP Commerce (mocked)
 
     steps:
       - uses: actions/checkout@v4
@@ -43,6 +87,7 @@ jobs:
         run: chmod +x ./.github/deploy-sap-commerce.sh
 
       - env:
+          API_BASE_URL: ${{ needs.mock_sap_api.outputs.api-url }}
           BUILD_CODE: ${{ needs.build_commerce.outputs.build_code }}
         run: ./.github/deploy-sap-commerce.sh $BUILD_CODE d1
         shell: bash

@@ -1,6 +1,6 @@
 [bash]#!/bin/bash
 
-create_deployment_output=$(curl -K "./scripts/curl-config.txt" \
+create_deployment_output=$(curl -K "./curl-config.txt" \
   -X POST "https://portalapi.commerce.ondemand.com/v2/subscriptions/$SUBSCRIPTION_CODE/deployments" \
   --header "Authorization: Bearer $API_TOKEN" \
   --data "{\"buildCode\":\"$1\",\"databaseUpdateMode\":\"UPDATE\", \"environmentCode\": \"$2\", \"strategy\": \"ROLLING_UPDATE\"}")

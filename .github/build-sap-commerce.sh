@@ -3,7 +3,7 @@
 branch=$1
 timestamp=$(date +"%Y-%m-%d-%H-%M-%S")
 
-create_build_output=$(curl -K "./.github/scripts/curl-config.txt" \
+create_build_output=$(curl -K "./.github/curl-config.txt" \
 -X POST "https://portalapi.commerce.ondemand.com/v2/subscriptions/$SUBSCRIPTION_CODE/builds" \
 --header "Authorization: Bearer $API_TOKEN" \
 --data "{\"branch\":\"$1\",\"name\":\"$branch-$timestamp\"}")

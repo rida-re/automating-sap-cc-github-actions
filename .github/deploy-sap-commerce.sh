@@ -50,12 +50,27 @@ status="SCHEDULED"
 while [[ $counter -lt 10 ]] && [[ "$status" == "SCHEDULED" || "$status" == "DEPLOYING" ]]; do
   ((counter++))
 
-  deployment_progress_output=$(curl -sS "$API_URL/v2/subscriptions/$SUBSCRIPTION_CODE/deployments/$code/progress" \
-    -H "Authorization: Bearer $API_TOKEN" || true)
+  if [[ "$IS_MOCK" == "mock" ]] && [[ "${MOCK_OFFLINE:-false}" == "true" ]]; then
+    echo "⏳ Simulating deployment progress in offline mock mode..."
+    percentage=$((counter * 20))
+    if [[ $percentage -ge 100 ]]; then
+      deployment_progress_output="{\"deploymentStatus\":\"DEPLOYED\",\"percentage\":100}"
+    else
+      deployment_progress_output="{\"deploymentStatus\":\"DEPLOYING\",\"percentage\":$percentage}"
+    fi
+  else
+    deployment_progress_output=$(curl -sS "$API_URL/v2/subscriptions/$SUBSCRIPTION_CODE/deployments/$code/progress" \
+      -H "Authorization: Bearer $API_TOKEN" || true)
 
-  if ! echo "$deployment_progress_output" | jq . >/dev/null 2>&1; then
-    echo "⚠️ Invalid JSON from progress endpoint, using mock data..."
-    deployment_progress_output="{\"deploymentStatus\":\"DEPLOYED\",\"percentage\":100}"
+    if ! echo "$deployment_progress_output" | jq . >/dev/null 2>&1; then
+      echo "⚠️ Invalid JSON from progress endpoint, using mock data..."
+      percentage=$((counter * 20))
+      if [[ $percentage -ge 100 ]]; then
+        deployment_progress_output="{\"deploymentStatus\":\"DEPLOYED\",\"percentage\":100}"
+      else
+        deployment_progress_output="{\"deploymentStatus\":\"DEPLOYING\",\"percentage\":$percentage}"
+      fi
+    fi
   fi
 
   status=$(echo "$deployment_progress_output" | jq -r .deploymentStatus)

@@ -74,81 +74,32 @@ jobs:
         run: |
           npm install -g json-server
           
-          # Create more realistic mock API data
+          # Create mock API data with all endpoints
           cat <<EOF > mock.json
           {
-            "subscriptions": {
-              "mock-subscription": {
-                "builds": [],
-                "deployments": []
-              }
-            },
-            "builds": [],
-            "deployments": []
-          }
-          EOF
-
-          # Enhanced routes for CCV2 endpoints
-          cat <<EOF > routes.json
-          {
-            "/health": "/health",
-            "/v2/subscriptions/:subId/builds": "/builds",
-            "/v2/subscriptions/:subId/builds/:code": "/builds/:code",
-            "/v2/subscriptions/:subId/builds/:code/progress": "/builds/:code",
-            "/v2/subscriptions/:subId/deployments": "/deployments",
-            "/v2/subscriptions/:subId/deployments/:code": "/deployments/:code",
-            "/v2/subscriptions/:subId/deployments/:code/progress": "/deployments/:code"
-          }
-          EOF
-
-          # Create health check endpoint
-          echo '{"health": [{"status": "ok"}]}' > mock.json
-          # Update mock data to include health check
-          cat <<EOF > mock.json
-          {
-            "health": [
-              {"status": "ok"}
-            ],
-            "subscriptions": {
-              "mock-subscription": {
-                "builds": [],
-                "deployments": []
-              }
-            },
-            "builds": [],
-            "deployments": []
-          }
-          EOF
-
-          # Custom middleware for mock server
-          cat <<EOF > middleware.js
-          module.exports = (req, res, next) => {
-            if (req.method === 'POST' && req.path.includes('/builds')) {
-              const buildCode = 'BUILD_' + Date.now();
-              req.body.code = buildCode;
-              req.body.status = 'BUILDING';
-              req.body.percentage = 0;
-            }
-            if (req.method === 'POST' && req.path.includes('/deployments')) {
-              const deployCode = 'DEPLOY_' + Date.now();
-              req.body.code = deployCode;
-              req.body.status = 'SCHEDULED';
-              req.body.percentage = 0;
-            }
-            if (req.method === 'GET' && req.path.includes('/progress')) {
-              const percentage = Math.min(100, (req.body.percentage || 0) + 20);
-              req.body.percentage = percentage;
-              if (percentage >= 100) {
-                req.body.status = req.path.includes('/builds') ? 'SUCCESS' : 'DEPLOYED';
+            "health": {"status": "ok"},
+            "v2": {
+              "subscriptions": {
+                "mock-subscription": {
+                  "builds": [{
+                    "code": "MOCK_BUILD_INITIAL",
+                    "status": "SUCCESS",
+                    "percentage": 100
+                  }],
+                  "deployments": [{
+                    "code": "MOCK_DEPLOY_INITIAL",
+                    "status": "DEPLOYED",
+                    "percentage": 100
+                  }]
+                }
               }
             }
-            next();
           }
           EOF
 
-          # Start mock server with middleware
+          # Start mock server
           echo "Starting mock server..."
-          nohup json-server --watch mock.json --routes routes.json --middlewares middleware.js --port 8080 > server.log 2>&1 &
+          nohup json-server --watch mock.json --port 8080 > server.log 2>&1 &
           
           # Wait for the server to start
           echo "⏳ Waiting for mock server to start..."
@@ -156,7 +107,7 @@ jobs:
           counter=0
           server_started=false
           
-          while [ $counter -lt $max_attempts ]; do
+          while ! curl -s http://localhost:8080/health > /dev/null 2>&1 && ! curl -s http://localhost:8080/v2/subscriptions/mock-subscription > /dev/null 2>&1; do
             if curl -s http://localhost:8080/health > /dev/null 2>&1; then
               server_started=true
               break

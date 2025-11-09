@@ -16,7 +16,7 @@ echo "🔧 Environment: $IS_MOCK"
 # Check mock server status if in mock mode
 if [[ "$IS_MOCK" == "mock" ]]; then
     echo "🔍 Checking mock server status..."
-    if curl -s "http://localhost:8080/health" > /dev/null 2>&1; then
+    if curl -s "http://localhost:8080/health" > /dev/null 2>&1 && curl -s "http://localhost:8080/v2/subscriptions/mock-subscription" > /dev/null 2>&1; then
         echo "✅ Mock server is ready"
     else
         echo "⚠️ Mock server not available, will use offline mock mode"

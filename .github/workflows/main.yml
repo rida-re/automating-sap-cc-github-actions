@@ -1,29 +1,80 @@
 name: sap-commerce-ccv2-deployment
-run-name: Mocked Deploy to SAP Commerce Cloud (CCV2)
+run-name: SAP Commerce Cloud (CCV2) Build & Deploy
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target Environment'
+        required: true
+        default: 'mock'
+        type: choice
+        options:
+          - mock
+          - development
+          - staging
+          - production
+      branch:
+        description: 'Branch to build'
+        required: true
+        default: 'main'
+      update_mode:
+        description: 'Database Update Mode'
+        required: true
+        default: 'UPDATE'
+        type: choice
+        options:
+          - UPDATE
+          - SKIP
+      deploy_strategy:
+        description: 'Deployment Strategy'
+        required: true
+        default: 'ROLLING_UPDATE'
+        type: choice
+        options:
+          - ROLLING_UPDATE
+          - RECREATE
   schedule:
     - cron: '0 22 * * *' # daily at 22:00
 
 env:
-  API_TOKEN: fake-token
-  SUBSCRIPTION_CODE: mock-subscription
-  API_BASE_URL: http://localhost:8080
+  API_TOKEN: ${{ secrets.SAP_API_TOKEN }}
+  SUBSCRIPTION_CODE: ${{ secrets.SAP_SUBSCRIPTION_CODE }}
+  API_BASE_URL: ${{ github.event.inputs.environment == 'mock' && 'http://localhost:8080' || 'https://portalapi.commerce.ondemand.com' }}
+  ENVIRONMENT_CODE: ${{ github.event.inputs.environment == 'mock' && 'd1' || github.event.inputs.environment }}
 
 jobs:
-  mock_sap_api:
+  setup:
     runs-on: ubuntu-latest
     outputs:
-      api-url: ${{ steps.start_mock.outputs.api_url }}
-    name: Start Mock SAP CCV2 API
+      environment: ${{ github.event.inputs.environment || 'mock' }}
+      api-url: ${{ steps.mock_setup.outputs.api_url }}
+    name: Setup Environment
     steps:
-      - name: Install and start mock SAP Commerce API
-        id: start_mock
+      - name: Validate Environment
+        id: validate
+        run: |
+          ENV="${{ github.event.inputs.environment || 'mock' }}"
+          if [[ "$ENV" != "mock" ]]; then
+            if [[ -z "${{ secrets.SAP_API_TOKEN }}" ]]; then
+              echo "❌ SAP_API_TOKEN is not set"
+              exit 1
+            fi
+            if [[ -z "${{ secrets.SAP_SUBSCRIPTION_CODE }}" ]]; then
+              echo "❌ SAP_SUBSCRIPTION_CODE is not set"
+              exit 1
+            fi
+          fi
+          echo "✅ Environment configuration validated"
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+
+      - name: Setup Mock API
+        if: github.event.inputs.environment == 'mock' || github.event_name == 'schedule'
+        id: mock_setup
         run: |
           npm install -g json-server
           
-          # Create mock API data
+          # Create more realistic mock API data
           cat <<EOF > mock.json
           {
             "subscriptions": {
@@ -31,31 +82,61 @@ jobs:
                 "builds": [],
                 "deployments": []
               }
-            }
+            },
+            "builds": [],
+            "deployments": []
           }
           EOF
 
-          # Create mock routes for CCV2 endpoints
+          # Enhanced routes for CCV2 endpoints
           cat <<EOF > routes.json
           {
             "/v2/subscriptions/:subId/builds": "/builds",
+            "/v2/subscriptions/:subId/builds/:code": "/builds/:code",
             "/v2/subscriptions/:subId/builds/:code/progress": "/builds/:code",
             "/v2/subscriptions/:subId/deployments": "/deployments",
+            "/v2/subscriptions/:subId/deployments/:code": "/deployments/:code",
             "/v2/subscriptions/:subId/deployments/:code/progress": "/deployments/:code"
           }
           EOF
 
-          # Start mock server in background
-          json-server --watch mock.json --routes routes.json --port 8080 &
+          # Custom middleware for mock server
+          cat <<EOF > middleware.js
+          module.exports = (req, res, next) => {
+            if (req.method === 'POST' && req.path.includes('/builds')) {
+              const buildCode = 'BUILD_' + Date.now();
+              req.body.code = buildCode;
+              req.body.status = 'BUILDING';
+              req.body.percentage = 0;
+            }
+            if (req.method === 'POST' && req.path.includes('/deployments')) {
+              const deployCode = 'DEPLOY_' + Date.now();
+              req.body.code = deployCode;
+              req.body.status = 'SCHEDULED';
+              req.body.percentage = 0;
+            }
+            if (req.method === 'GET' && req.path.includes('/progress')) {
+              const percentage = Math.min(100, (req.body.percentage || 0) + 20);
+              req.body.percentage = percentage;
+              if (percentage >= 100) {
+                req.body.status = req.path.includes('/builds') ? 'SUCCESS' : 'DEPLOYED';
+              }
+            }
+            next();
+          }
+          EOF
+
+          # Start mock server with middleware
+          json-server --watch mock.json --routes routes.json --middlewares middleware.js --port 8080 &
 
           echo "api_url=http://localhost:8080" >> $GITHUB_OUTPUT
-
           echo "✅ Mock SAP CCV2 API running at http://localhost:8080"
 
+
   build_commerce:
-    needs: mock_sap_api
+    needs: setup
     runs-on: ubuntu-latest
-    name: Build SAP Commerce (mocked)
+    name: Build SAP Commerce
     outputs:
       build_code: ${{ steps.build_commerce.outputs.build_code }}
 
@@ -69,14 +150,17 @@ jobs:
 
       - id: build_commerce
         env:
-          API_BASE_URL: ${{ needs.mock_sap_api.outputs.api-url }}
-        run: ./.github/build-sap-commerce.sh main
+          BRANCH: ${{ github.event.inputs.branch || 'main' }}
+          ENVIRONMENT: ${{ needs.setup.outputs.environment }}
+          API_BASE_URL: ${{ needs.setup.outputs.environment == 'mock' && needs.setup.outputs.api-url || 'https://portalapi.commerce.ondemand.com' }}
+        run: ./.github/build-sap-commerce.sh $BRANCH
         shell: bash
 
   deploy_commerce:
-    needs: [mock_sap_api, build_commerce]
+    needs: [setup, build_commerce]
     runs-on: ubuntu-latest
-    name: Deploy SAP Commerce (mocked)
+    name: Deploy SAP Commerce
+    environment: ${{ github.event.inputs.environment || 'mock' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -87,7 +171,10 @@ jobs:
         run: chmod +x ./.github/deploy-sap-commerce.sh
 
       - env:
-          API_BASE_URL: ${{ needs.mock_sap_api.outputs.api-url }}
           BUILD_CODE: ${{ needs.build_commerce.outputs.build_code }}
-        run: ./.github/deploy-sap-commerce.sh $BUILD_CODE d1
+          UPDATE_MODE: ${{ github.event.inputs.update_mode || 'UPDATE' }}
+          DEPLOY_STRATEGY: ${{ github.event.inputs.deploy_strategy || 'ROLLING_UPDATE' }}
+          ENVIRONMENT: ${{ needs.setup.outputs.environment }}
+          API_BASE_URL: ${{ needs.setup.outputs.environment == 'mock' && needs.setup.outputs.api-url || 'https://portalapi.commerce.ondemand.com' }}
+        run: ./.github/deploy-sap-commerce.sh $BUILD_CODE ${{ env.ENVIRONMENT_CODE }} $UPDATE_MODE $DEPLOY_STRATEGY
         shell: bash

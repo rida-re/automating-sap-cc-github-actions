@@ -1,11 +1,17 @@
 #!/bin/bash
 set -euo pipefail
 
+# Input parameters
 branch=${1:-main}
 timestamp=$(date +"%Y-%m-%d-%H-%M-%S")
 
+# Configuration
 API_URL="${API_BASE_URL:-https://portalapi.commerce.ondemand.com}"
 BUILD_NAME="${branch}-${timestamp}"
+IS_MOCK="${ENVIRONMENT:-mock}"
+
+# Log environment
+echo "🔧 Environment: $IS_MOCK"
 
 echo "🚀 Starting SAP Commerce build for branch: $branch"
 echo "📦 API URL: $API_URL"

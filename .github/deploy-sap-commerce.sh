@@ -1,10 +1,20 @@
 #!/bin/bash
 set -euo pipefail
 
+# Input parameters
 BUILD_CODE=${1:-MOCK_BUILD}
 ENVIRONMENT_CODE=${2:-d1}
+UPDATE_MODE=${3:-UPDATE}
+DEPLOY_STRATEGY=${4:-ROLLING_UPDATE}
 
+# Configuration
 API_URL="${API_BASE_URL:-https://portalapi.commerce.ondemand.com}"
+IS_MOCK="${ENVIRONMENT:-mock}"
+
+# Log environment
+echo "🔧 Environment: $IS_MOCK"
+echo "🔄 Update Mode: $UPDATE_MODE"
+echo "📦 Deploy Strategy: $DEPLOY_STRATEGY"
 
 echo "🚀 Starting SAP Commerce deployment"
 echo "📦 API URL: $API_URL"
@@ -15,7 +25,7 @@ echo "🌍 Environment: $ENVIRONMENT_CODE"
 create_deployment_output=$(curl -sS -X POST "$API_URL/v2/subscriptions/$SUBSCRIPTION_CODE/deployments" \
   -H "Authorization: Bearer $API_TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"buildCode\":\"$BUILD_CODE\",\"databaseUpdateMode\":\"UPDATE\",\"environmentCode\":\"$ENVIRONMENT_CODE\",\"strategy\":\"ROLLING_UPDATE\"}" || true)
+  -d "{\"buildCode\":\"$BUILD_CODE\",\"databaseUpdateMode\":\"$UPDATE_MODE\",\"environmentCode\":\"$ENVIRONMENT_CODE\",\"strategy\":\"$DEPLOY_STRATEGY\"}" || true)
 
 # Validate JSON
 if ! echo "$create_deployment_output" | jq . >/dev/null 2>&1; then

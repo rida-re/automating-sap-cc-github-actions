@@ -72,58 +72,28 @@ jobs:
         if: github.event.inputs.environment == 'mock' || github.event_name == 'schedule'
         id: mock_setup
         run: |
-          npm install -g json-server
+          # Install dependencies
+          npm init -y
+          npm install express
           
-          # Create mock API data with all endpoints
-          cat <<EOF > mock.json
-          {
-            "health": {"status": "ok"},
-            "v2": {
-              "subscriptions": {
-                "mock-subscription": {
-                  "builds": [{
-                    "code": "MOCK_BUILD_INITIAL",
-                    "status": "SUCCESS",
-                    "percentage": 100
-                  }],
-                  "deployments": [{
-                    "code": "MOCK_DEPLOY_INITIAL",
-                    "status": "DEPLOYED",
-                    "percentage": 100
-                  }]
-                }
-              }
-            }
-          }
-          EOF
-
-          # Start mock server
           echo "Starting mock server..."
-          nohup json-server --watch mock.json --port 8080 > server.log 2>&1 &
+          node .github/mock-server.js > server.log 2>&1 &
           
           # Wait for the server to start
           echo "⏳ Waiting for mock server to start..."
-          max_attempts=30
+          max_attempts=15
           counter=0
-          server_started=false
-          
-          while ! curl -s http://localhost:8080/health > /dev/null 2>&1 && ! curl -s http://localhost:8080/v2/subscriptions/mock-subscription > /dev/null 2>&1; do
-            if curl -s http://localhost:8080/health > /dev/null 2>&1; then
-              server_started=true
-              break
+          while ! curl -s http://localhost:8080/health > /dev/null 2>&1; do
+            if [ $counter -ge $max_attempts ]; then
+              echo "❌ Mock server failed to start in time"
+              echo "Server log:"
+              cat server.log
+              exit 1
             fi
-            
             echo "Attempt $((counter + 1))/$max_attempts: Server not ready yet..."
             counter=$((counter + 1))
             sleep 2
           done
-          
-          if [ "$server_started" = false ]; then
-            echo "❌ Mock server failed to start in time"
-            echo "Server log:"
-            cat server.log
-            exit 1
-          fi
 
           echo "api_url=http://localhost:8080" >> $GITHUB_OUTPUT
           echo "✅ Mock SAP CCV2 API running at http://localhost:8080"

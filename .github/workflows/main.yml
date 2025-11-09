@@ -25,6 +25,7 @@ jobs:
         run: |
           #!/bin/bash
           echo "URL: ${{env.CCV2_BASE_URL}}"
+          echo "URL: ${{secrets.CCV2_SUBSCRIPTION_CODE}}"
           echo "BUILD_NAME : ${{ env.BUILD_NAME }}"
           ccv2_build_url="${{env.CCV2_BASE_URL}}/builds";
           payload='{"branch": "'"${BRANCH_NAME}"'", "name": "'"${BUILD_NAME}"'"}';

@@ -1,94 +1,26 @@
+## Workflow for building and deploying into SAP Commerce cloud CCV2 dev and staging envs
 name: CI/CD - CCv2 Build & Deploy
 
 env:
   BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
-  BUILD_NAME: SAPCOMMERCE.BUILD.$(date +'%Y.%m.%d.%H.%M')
+  BUILD_NAME:  SAPCOMMERCE.BUILD.$(date +'%Y.%m.%d.%H.%M')
   DATABASE_UPDATE_MODE: UPDATE
   DEPLOYMENT_STRATEGY: ROLLING_UPDATE
   ENVIRONMENT_CODE: d1
+  #CCV2_URL: https://portalrotapi.hana.ondemand.com/v2/subscriptions
   CCV2_URL: https://sap-commerce-cloud-ccv2-mock.free.beeceptor.com/v2/subscriptions
   CCV2_AUTH_ACCESS_TOKEN: ${{ secrets.CCV2_AUTH_ACCESS_TOKEN }}
   CCV2_SUBSCRIPTION_CODE: ${{ secrets.CCV2_SUBSCRIPTION_CODE }}
-  CCV2_BASE_URL: https://sap-commerce-cloud-ccv2-mock.free.beeceptor.com/v2/subscriptions/${{secrets.CCV2_SUBSCRIPTION_CODE}}
-  SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-  SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+  #CCV2_BASE_URL : https://portalrotapi.hana.ondemand.com/v2/subscriptions/${{secrets.CCV2_SUBSCRIPTION_CODE}}
+  CCV2_BASE_URL : https://sap-commerce-cloud-ccv2-mock.free.beeceptor.com/v2/subscriptions/${{secrets.CCV2_SUBSCRIPTION_CODE}}
 on:
   push:
     branches:
       - 'release/**'
       - develop
-      - main
-  pull_request:
-    branches:
-      - develop
-      - main
   workflow_dispatch:
-
 jobs:
-  code-quality:
-    name: Code Quality Analysis
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Cache SonarQube packages
-        uses: actions/cache@v3
-        with:
-          path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
-          restore-keys: ${{ runner.os }}-sonar
-
-      - name: Set up JDK 11
-        uses: actions/setup-java@v3
-        with:
-          java-version: '11'
-          distribution: 'adopt'
-          cache: maven
-
-      - name: SonarQube Analysis
-        run: |
-          mvn verify sonar:sonar \
-            -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }} \
-            -Dsonar.organization=${{ github.repository_owner }} \
-            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
-            -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
-            -Dsonar.java.binaries=target/classes \
-            -Dsonar.coverage.exclusions=**/*Test.java,**/*Tests.java,**/test/**/*
-
-  dependency-check:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Set up JDK 11
-        uses: actions/setup-java@v3
-        with:
-          java-version: '11'
-          distribution: 'adopt'
-          cache: maven
-
-      - name: Run OWASP Dependency Check
-        uses: dependency-check/Dependency-Check_Action@main
-        with:
-          project: 'SAP Commerce Cloud'
-          path: '.'
-          format: 'HTML'
-          args: >
-            --failOnCVSS 7
-            --enableExperimental
-
-      - name: Upload Security Report
-        uses: actions/upload-artifact@v3
-        with:
-          name: dependency-check-report
-          path: reports
-
   SAPCOM_BUILD_AND_DEPLOY_JOB:
-    needs: [code-quality, dependency-check]
-    if: success()
     runs-on: ubuntu-latest
     steps:
       - name: Debug secrets presence

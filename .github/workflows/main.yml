@@ -1,180 +1,100 @@
-name: sap-commerce-ccv2-deployment
-run-name: SAP Commerce Cloud (CCV2) Build & Deploy
-
-on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Target Environment'
-        required: true
-        default: 'mock'
-        type: choice
-        options:
-          - mock
-          - development
-          - staging
-          - production
-      branch:
-        description: 'Branch to build'
-        required: true
-        default: 'main'
-      update_mode:
-        description: 'Database Update Mode'
-        required: true
-        default: 'UPDATE'
-        type: choice
-        options:
-          - UPDATE
-          - SKIP
-      deploy_strategy:
-        description: 'Deployment Strategy'
-        required: true
-        default: 'ROLLING_UPDATE'
-        type: choice
-        options:
-          - ROLLING_UPDATE
-          - RECREATE
-  schedule:
-    - cron: '0 22 * * *' # daily at 22:00
-
+## Workflow for building and deploying into SAP Commerce cloud CCV2 dev and staging envs
 env:
-  API_TOKEN: ${{ secrets.SAP_API_TOKEN }}
-  SUBSCRIPTION_CODE: ${{ secrets.SAP_SUBSCRIPTION_CODE }}
-  API_BASE_URL: ${{ github.event.inputs.environment == 'mock' && 'http://localhost:8080' || 'https://portalapi.commerce.ondemand.com' }}
-  ENVIRONMENT_CODE: ${{ github.event.inputs.environment == 'mock' && 'd1' || github.event.inputs.environment }}
-
+  BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+  BUILD_NAME:  SAPCOMMERCE.BUILD.$(date +'%Y.%m.%d.%H.%M')
+  DATABASE_UPDATE_MODE: UPDATE
+  DEPLOYMENT_STRATEGY: ROLLING_UPDATE
+  ENVIRONMENT_CODE: d1
+  CCV2_URL: https://portalrotapi.hana.ondemand.com/v2/subscriptions
+  CCV2_AUTH_ACCESS_TOKEN: ${{ secrets.CCV2_AUTH_ACCESS_TOKEN }}
+  CCV2_SUBSCRIPTION_CODE: ${{ secrets.CCV2_SUBSCRIPTION_CODE }}
+  CCV2_BASE_URL : https://portalrotapi.hana.ondemand.com/v2/subscriptions/${{secrets.CCV2_SUBSCRIPTION_CODE}}
+on:
+  push:
+    branches:
+      - 'release/**'
+      - develop
+  workflow_dispatch:
 jobs:
-  setup:
+  SAPCOM_BUILD_AND_DEPLOY_JOB:
     runs-on: ubuntu-latest
-    outputs:
-      environment: ${{ github.event.inputs.environment || 'mock' }}
-      api-url: ${{ steps.mock_setup.outputs.api_url }}
-    name: Setup Environment
     steps:
-      - name: Validate Environment
-        id: validate
+      - name: Create Build
         run: |
-          ENV="${{ github.event.inputs.environment || 'mock' }}"
-          if [[ "$ENV" != "mock" ]]; then
-            if [[ -z "${{ secrets.SAP_API_TOKEN }}" ]]; then
-              echo "❌ SAP_API_TOKEN is not set"
-              exit 1
-            fi
-            if [[ -z "${{ secrets.SAP_SUBSCRIPTION_CODE }}" ]]; then
-              echo "❌ SAP_SUBSCRIPTION_CODE is not set"
-              exit 1
-            fi
-          fi
-          echo "✅ Environment configuration validated"
-          echo "environment=$ENV" >> $GITHUB_OUTPUT
-
-      - uses: actions/checkout@v4
-        if: github.event.inputs.environment == 'mock' || github.event_name == 'schedule'
-        with:
-          sparse-checkout: .github
-
-      - name: Setup Mock API
-        if: github.event.inputs.environment == 'mock' || github.event_name == 'schedule'
-        id: mock_setup
-        working-directory: .github/mock
+          #!/bin/bash
+          echo "URL: ${{env.CCV2_BASE_URL}}"
+          echo "BUILD_NAME : ${{ env.BUILD_NAME }}"
+          ccv2_build_url="${{env.CCV2_BASE_URL}}/builds";
+          payload='{"branch": "${{ env.BRANCH_NAME}}", "name": "'"${{ env.BUILD_NAME }}"'"}';
+          echo "Payload :: $payload"
+          buildcode=$(curl --location --request POST "$ccv2_build_url" --header 'Content-Type: application/json' --header "Authorization: Bearer ${{env.CCV2_AUTH_ACCESS_TOKEN}}" --data-raw "$payload" | jq '.code')
+          echo "buildcode=$buildcode" >> $GITHUB_ENV
+          echo "Create Build Response:  $buildcode"
+      - name: Check Build Progress
         run: |
-          # Install dependencies
-          npm install
-          
-          echo "Starting mock server..."
-          node server.js > server.log 2>&1 &
-          server_pid=$!
-          
-          # Wait for the server to start
-          echo "⏳ Waiting for mock server to start..."
-          max_attempts=30
-          counter=0
-          server_started=false
-          
-          while [ $counter -lt $max_attempts ]; do
-            if curl -s http://localhost:8080/health > /dev/null 2>&1; then
-              server_started=true
-              echo "✅ Mock server is running"
-              break
-            fi
-            
-            # Check if the server process is still running
-            if ! kill -0 $server_pid 2>/dev/null; then
-              echo "❌ Mock server process died"
-              echo "Server log:"
-              cat server.log
-              exit 1
-            fi
-            
-            echo "⏳ Waiting for server to be ready (attempt $((counter + 1))/$max_attempts)..."
-            counter=$((counter + 1))
-            sleep 5
-          done
-          
-          if [ "$server_started" != "true" ]; then
-            echo "❌ Mock server failed to start in time"
-            echo "Server log:"
-            cat server.log
-            exit 1
-          fi
-          
-          # Double-check server is responding
-          if ! curl -s http://localhost:8080/health > /dev/null 2>&1; then
-            echo "❌ Mock server health check failed"
-            echo "Server log:"
-            cat server.log
-            exit 1
-          fi
-          
-          # Ensure the mock server is ready for requests
-          sleep 5
-
-          echo "api_url=http://localhost:8080" >> $GITHUB_OUTPUT
-          echo "✅ Mock SAP CCV2 API running at http://localhost:8080"
-
-
-  build_commerce:
-    needs: setup
-    runs-on: ubuntu-latest
-    name: Build SAP Commerce
-    outputs:
-      build_code: ${{ steps.build_commerce.outputs.build_code }}
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: .github
-
-      - name: Grant execute permission for build script
-        run: chmod +x ./.github/build-sap-commerce.sh
-
-      - id: build_commerce
-        env:
-          BRANCH: ${{ github.event.inputs.branch || 'main' }}
-          ENVIRONMENT: ${{ needs.setup.outputs.environment }}
-          API_BASE_URL: ${{ needs.setup.outputs.environment == 'mock' && needs.setup.outputs.api-url || 'https://portalapi.commerce.ondemand.com' }}
-        run: ./.github/build-sap-commerce.sh $BRANCH
+         echo "Check Build progress of buildcode : ${{ env.buildcode }}"
+         ccv2_build_url="${{env.CCV2_BASE_URL}}/builds";
+         while (true) 
+           do
+              echo "checkBuild buildcode : ${{ env.buildcode }}"
+              progress_ccv2_build_url="$ccv2_build_url/${{ env.buildcode }}/progress"
+              echo "URL: $progress_ccv2_build_url"
+              buildresponse=$(curl --location --request GET "$progress_ccv2_build_url" --header "Authorization: Bearer ${{env.CCV2_AUTH_ACCESS_TOKEN}}")
+              buildStatus=$(jq -n "$buildresponse" | jq '.buildStatus')
+              percentage=$(jq -n "$buildresponse" | jq '.percentage')
+              echo "Check Progress Status: $buildStatus"
+              if [ $buildStatus = '"SUCCESS"' ];then
+                echo "Build Succeeded" 
+                break
+              elif [ $buildStatus  = '"FAIL"' ];then
+                echo "Failed"
+                exit 1
+              else
+                echo "Build inProgress.. $percentage % completed" 
+                sleep 600
+              fi
+           done
+          echo "Build Completed"
         shell: bash
-
-  deploy_commerce:
-    needs: [setup, build_commerce]
-    runs-on: ubuntu-latest
-    name: Deploy SAP Commerce
-    environment: ${{ github.event.inputs.environment || 'mock' }}
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: .github
-
-      - name: Grant execute permission for deploy script
-        run: chmod +x ./.github/deploy-sap-commerce.sh
-
-      - env:
-          BUILD_CODE: ${{ needs.build_commerce.outputs.build_code }}
-          UPDATE_MODE: ${{ github.event.inputs.update_mode || 'UPDATE' }}
-          DEPLOY_STRATEGY: ${{ github.event.inputs.deploy_strategy || 'ROLLING_UPDATE' }}
-          ENVIRONMENT: ${{ needs.setup.outputs.environment }}
-          API_BASE_URL: ${{ needs.setup.outputs.environment == 'mock' && needs.setup.outputs.api-url || 'https://portalapi.commerce.ondemand.com' }}
-        run: ./.github/deploy-sap-commerce.sh $BUILD_CODE ${{ env.ENVIRONMENT_CODE }} $UPDATE_MODE $DEPLOY_STRATEGY
+      - name: Create Deployment
+        run: |
+          #!/bin/bash
+          echo "URL: ${{env.CCV2_BASE_URL}}"
+          ccv2_deployment_url="${{env.CCV2_BASE_URL}}/deployments";
+          echo "Deployment URL: $ccv2_deployment_url"
+          echo "Branch name: ${{env.BRANCH_NAME}}"
+          environmentCode="${{env.ENVIRONMENT_CODE}}";
+          if [[ ${{env.BRANCH_NAME}} == "release/"* ]];then
+            environmentCode="s1"
+          fi
+          payload='{"buildCode": ${{ env.buildcode }}, "databaseUpdateMode": "UPDATE", "environmentCode": "'"$environmentCode"'", "strategy": "ROLLING_UPDATE"}';
+          echo "Payload: $payload"
+          deploymentcode=$(curl --location --request POST "$ccv2_deployment_url" --header 'Content-Type: application/json' --header "Authorization: Bearer ${{env.CCV2_AUTH_ACCESS_TOKEN}}" --data-raw "$payload" | jq '.code')
+          echo "deploymentcode=$deploymentcode" >> $GITHUB_ENV
+          echo "Create Deployment Response:  $deploymentcode" 
+      - name: Check Deployment Progress
+        run: |
+         echo "Check Deployment progress of deployment code : ${{ env.deploymentcode }}"
+         ccv2_deployment_url="${{env.CCV2_BASE_URL}}/deployments";
+         while (true) 
+           do
+              echo "checkdeployment progress for code : ${{ env.deploymentcode }}"
+              ccv2_deployment_progress_url="$ccv2_deployment_url/${{env.deploymentcode}}/progress"
+              echo "URL: $progress_ccv2_deployment_url"
+              deploymentresponse=$(curl --location --request GET "$ccv2_deployment_progress_url" --header "Authorization: Bearer ${{env.CCV2_AUTH_ACCESS_TOKEN}}")
+              deploymentStatus=$(jq -n "$deploymentresponse" | jq '.deploymentStatus')
+              percentage=$(jq -n "$deploymentresponse" | jq '.percentage')
+              echo "Check Progress Status: $deploymentStatus"
+              if [ $deploymentStatus = '"DEPLOYED"' ];then
+                echo "Deployment Succeeded" 
+                break
+              elif [ $deploymentStatus  = '"FAIL"' ];then
+                echo "Failed"
+                exit 1
+              else
+                echo "Deployment inProgress.. $percentage % completed" 
+                sleep 600
+              fi
+           done
+          echo "Deployment Completed"
         shell: bash

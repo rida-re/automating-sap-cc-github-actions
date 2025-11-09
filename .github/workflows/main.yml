@@ -27,36 +27,38 @@ jobs:
           echo "URL: ${{env.CCV2_BASE_URL}}"
           echo "BUILD_NAME : ${{ env.BUILD_NAME }}"
           ccv2_build_url="${{env.CCV2_BASE_URL}}/builds";
-          payload='{"branch": "${{ env.BRANCH_NAME}}", "name": "'"${{ env.BUILD_NAME }}"'"}';
+          payload='{"branch": "'"${BRANCH_NAME}"'", "name": "'"${BUILD_NAME}"'"}';
+          # Use runtime shell variables (BRANCH_NAME and BUILD_NAME) and show payload
           echo "Payload :: $payload"
-          buildcode=$(curl --location --request POST "$ccv2_build_url" --header 'Content-Type: application/json' --header "Authorization: Bearer ${{env.CCV2_AUTH_ACCESS_TOKEN}}" --data-raw "$payload" | jq '.code')
+          # Extract raw code string with jq -r so it has no surrounding quotes
+          buildcode=$(curl --location --request POST "$ccv2_build_url" --header 'Content-Type: application/json' --header "Authorization: Bearer ${{env.CCV2_AUTH_ACCESS_TOKEN}}" --data-raw "$payload" | jq -r '.code')
           echo "buildcode=$buildcode" >> $GITHUB_ENV
           echo "Create Build Response:  $buildcode"
       - name: Check Build Progress
         run: |
-         echo "Check Build progress of buildcode : ${{ env.buildcode }}"
+         echo "Check Build progress of buildcode : $buildcode"
          ccv2_build_url="${{env.CCV2_BASE_URL}}/builds";
-         while (true) 
-           do
-              echo "checkBuild buildcode : ${{ env.buildcode }}"
-              progress_ccv2_build_url="$ccv2_build_url/${{ env.buildcode }}/progress"
+         while true; do
+              echo "checkBuild buildcode : $buildcode"
+              progress_ccv2_build_url="$ccv2_build_url/$buildcode/progress"
               echo "URL: $progress_ccv2_build_url"
               buildresponse=$(curl --location --request GET "$progress_ccv2_build_url" --header "Authorization: Bearer ${{env.CCV2_AUTH_ACCESS_TOKEN}}")
-              buildStatus=$(jq -n "$buildresponse" | jq '.buildStatus')
-              percentage=$(jq -n "$buildresponse" | jq '.percentage')
+              # Parse JSON response correctly and extract raw values
+              buildStatus=$(echo "$buildresponse" | jq -r '.buildStatus')
+              percentage=$(echo "$buildresponse" | jq -r '.percentage')
               echo "Check Progress Status: $buildStatus"
-              if [ $buildStatus = '"SUCCESS"' ];then
-                echo "Build Succeeded" 
+              if [ "$buildStatus" = "SUCCESS" ]; then
+                echo "Build Succeeded"
                 break
-              elif [ $buildStatus  = '"FAIL"' ];then
+              elif [ "$buildStatus" = "FAIL" ]; then
                 echo "Failed"
                 exit 1
               else
-                echo "Build inProgress.. $percentage % completed" 
+                echo "Build inProgress.. $percentage % completed"
                 sleep 600
               fi
-           done
-          echo "Build Completed"
+         done
+         echo "Build Completed"
         shell: bash
       - name: Create Deployment
         run: |
@@ -64,39 +66,39 @@ jobs:
           echo "URL: ${{env.CCV2_BASE_URL}}"
           ccv2_deployment_url="${{env.CCV2_BASE_URL}}/deployments";
           echo "Deployment URL: $ccv2_deployment_url"
-          echo "Branch name: ${{env.BRANCH_NAME}}"
+          echo "Branch name: $BRANCH_NAME"
           environmentCode="${{env.ENVIRONMENT_CODE}}";
-          if [[ ${{env.BRANCH_NAME}} == "release/"* ]];then
+          if [[ $BRANCH_NAME == "release/"* ]]; then
             environmentCode="s1"
           fi
-          payload='{"buildCode": ${{ env.buildcode }}, "databaseUpdateMode": "UPDATE", "environmentCode": "'"$environmentCode"'", "strategy": "ROLLING_UPDATE"}';
+          # Ensure buildcode is quoted in JSON payload
+          payload='{"buildCode": "'"$buildcode"'", "databaseUpdateMode": "UPDATE", "environmentCode": "'"$environmentCode"'", "strategy": "ROLLING_UPDATE"}';
           echo "Payload: $payload"
-          deploymentcode=$(curl --location --request POST "$ccv2_deployment_url" --header 'Content-Type: application/json' --header "Authorization: Bearer ${{env.CCV2_AUTH_ACCESS_TOKEN}}" --data-raw "$payload" | jq '.code')
+          deploymentcode=$(curl --location --request POST "$ccv2_deployment_url" --header 'Content-Type: application/json' --header "Authorization: Bearer ${{env.CCV2_AUTH_ACCESS_TOKEN}}" --data-raw "$payload" | jq -r '.code')
           echo "deploymentcode=$deploymentcode" >> $GITHUB_ENV
           echo "Create Deployment Response:  $deploymentcode" 
       - name: Check Deployment Progress
         run: |
-         echo "Check Deployment progress of deployment code : ${{ env.deploymentcode }}"
+         echo "Check Deployment progress of deployment code : $deploymentcode"
          ccv2_deployment_url="${{env.CCV2_BASE_URL}}/deployments";
-         while (true) 
-           do
-              echo "checkdeployment progress for code : ${{ env.deploymentcode }}"
-              ccv2_deployment_progress_url="$ccv2_deployment_url/${{env.deploymentcode}}/progress"
-              echo "URL: $progress_ccv2_deployment_url"
+         while true; do
+              echo "checkdeployment progress for code : $deploymentcode"
+              ccv2_deployment_progress_url="$ccv2_deployment_url/$deploymentcode/progress"
+              echo "URL: $ccv2_deployment_progress_url"
               deploymentresponse=$(curl --location --request GET "$ccv2_deployment_progress_url" --header "Authorization: Bearer ${{env.CCV2_AUTH_ACCESS_TOKEN}}")
-              deploymentStatus=$(jq -n "$deploymentresponse" | jq '.deploymentStatus')
-              percentage=$(jq -n "$deploymentresponse" | jq '.percentage')
+              deploymentStatus=$(echo "$deploymentresponse" | jq -r '.deploymentStatus')
+              percentage=$(echo "$deploymentresponse" | jq -r '.percentage')
               echo "Check Progress Status: $deploymentStatus"
-              if [ $deploymentStatus = '"DEPLOYED"' ];then
-                echo "Deployment Succeeded" 
+              if [ "$deploymentStatus" = "DEPLOYED" ]; then
+                echo "Deployment Succeeded"
                 break
-              elif [ $deploymentStatus  = '"FAIL"' ];then
+              elif [ "$deploymentStatus" = "FAIL" ]; then
                 echo "Failed"
                 exit 1
               else
-                echo "Deployment inProgress.. $percentage % completed" 
+                echo "Deployment inProgress.. $percentage % completed"
                 sleep 600
               fi
-           done
-          echo "Deployment Completed"
+         done
+         echo "Deployment Completed"
         shell: bash

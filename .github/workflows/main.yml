@@ -91,6 +91,7 @@ jobs:
           # Enhanced routes for CCV2 endpoints
           cat <<EOF > routes.json
           {
+            "/health": "/health",
             "/v2/subscriptions/:subId/builds": "/builds",
             "/v2/subscriptions/:subId/builds/:code": "/builds/:code",
             "/v2/subscriptions/:subId/builds/:code/progress": "/builds/:code",
@@ -99,6 +100,9 @@ jobs:
             "/v2/subscriptions/:subId/deployments/:code/progress": "/deployments/:code"
           }
           EOF
+
+          # Create health check endpoint
+          echo '{"status": "ok"}' > health.json
 
           # Custom middleware for mock server
           cat <<EOF > middleware.js
@@ -126,8 +130,28 @@ jobs:
           }
           EOF
 
-          # Start mock server with middleware
-          json-server --watch mock.json --routes routes.json --middlewares middleware.js --port 8080 &
+          # Start mock server with middleware and wait for it to be ready
+          json-server --watch mock.json --routes routes.json --middlewares middleware.js --port 8080 > server.log 2>&1 &
+          server_pid=$!
+
+          # Wait for the server to start
+          echo "⏳ Waiting for mock server to start..."
+          max_attempts=30
+          counter=0
+          while ! curl -s http://localhost:8080/health > /dev/null 2>&1; do
+            if ! ps -p $server_pid > /dev/null; then
+              echo "❌ Mock server process died. Check server.log for details"
+              cat server.log
+              exit 1
+            fi
+            ((counter++))
+            if [ $counter -ge $max_attempts ]; then
+              echo "❌ Mock server failed to start in time"
+              cat server.log
+              exit 1
+            fi
+            sleep 1
+          done
 
           echo "api_url=http://localhost:8080" >> $GITHUB_OUTPUT
           echo "✅ Mock SAP CCV2 API running at http://localhost:8080"

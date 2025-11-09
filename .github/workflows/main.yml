@@ -15,7 +15,7 @@ on:
   push:
     branches:
       - 'release/**'
-      - develop
+      - main
   workflow_dispatch:
 jobs:
   SAPCOM_BUILD_AND_DEPLOY_JOB:

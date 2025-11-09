@@ -68,16 +68,21 @@ jobs:
           echo "✅ Environment configuration validated"
           echo "environment=$ENV" >> $GITHUB_OUTPUT
 
+      - uses: actions/checkout@v4
+        if: github.event.inputs.environment == 'mock' || github.event_name == 'schedule'
+        with:
+          sparse-checkout: .github
+
       - name: Setup Mock API
         if: github.event.inputs.environment == 'mock' || github.event_name == 'schedule'
         id: mock_setup
+        working-directory: .github/mock
         run: |
           # Install dependencies
-          npm init -y
-          npm install express
+          npm install
           
           echo "Starting mock server..."
-          node .github/mock-server.js > server.log 2>&1 &
+          node server.js > server.log 2>&1 &
           
           # Wait for the server to start
           echo "⏳ Waiting for mock server to start..."

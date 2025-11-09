@@ -15,7 +15,7 @@ on:
   push:
     branches:
       - 'release/**'
-      - main
+      - develop
   workflow_dispatch:
 jobs:
   SAPCOM_BUILD_AND_DEPLOY_JOB:
@@ -59,7 +59,7 @@ jobs:
               echo "URL: $progress_ccv2_build_url"
               buildresponse=$(curl --location --request GET "$progress_ccv2_build_url" --header "Authorization: Bearer ${{env.CCV2_AUTH_ACCESS_TOKEN}}")
               # Parse JSON response correctly and extract raw values
-              buildStatus=$(echo "$buildresponse" | jq -r '.buildStatus')
+              buildStatus=$(echo "$buildresponse" | jq -r '.status')
               percentage=$(echo "$buildresponse" | jq -r '.percentage')
               echo "Check Progress Status: $buildStatus"
               if [ "$buildStatus" = "SUCCESS" ]; then

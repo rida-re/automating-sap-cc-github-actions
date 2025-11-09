@@ -5,10 +5,12 @@ env:
   DATABASE_UPDATE_MODE: UPDATE
   DEPLOYMENT_STRATEGY: ROLLING_UPDATE
   ENVIRONMENT_CODE: d1
-  CCV2_URL: https://portalrotapi.hana.ondemand.com/v2/subscriptions
+  #CCV2_URL: https://portalrotapi.hana.ondemand.com/v2/subscriptions
+  CCV2_URL: https://sap-commerce-cloud-ccv2-mock.free.beeceptor.com/v2/subscriptions
   CCV2_AUTH_ACCESS_TOKEN: ${{ secrets.CCV2_AUTH_ACCESS_TOKEN }}
   CCV2_SUBSCRIPTION_CODE: ${{ secrets.CCV2_SUBSCRIPTION_CODE }}
-  CCV2_BASE_URL : https://portalrotapi.hana.ondemand.com/v2/subscriptions/${{secrets.CCV2_SUBSCRIPTION_CODE}}
+  #CCV2_BASE_URL : https://portalrotapi.hana.ondemand.com/v2/subscriptions/${{secrets.CCV2_SUBSCRIPTION_CODE}}
+  CCV2_BASE_URL : https://sap-commerce-cloud-ccv2-mock.free.beeceptor.com/v2/subscriptions/${{secrets.CCV2_SUBSCRIPTION_CODE}}
 on:
   push:
     branches:

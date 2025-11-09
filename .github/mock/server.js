@@ -78,6 +78,28 @@ app.get('/v2/subscriptions/:subId/deployments/:code/progress', (req, res) => {
 });
 
 // Start server
-app.listen(port, () => {
+const server = app.listen(port, () => {
     console.log(`Mock server running on port ${port}`);
+});
+
+// Handle startup errors
+server.on('error', (err) => {
+    console.error('Failed to start mock server:', err);
+    process.exit(1);
+});
+
+// Initialize with some data
+builds.push({
+    code: 'MOCK_BUILD_INITIAL',
+    status: 'SUCCESS',
+    percentage: 100,
+    branch: 'main',
+    name: 'initial-build'
+});
+
+deployments.push({
+    code: 'MOCK_DEPLOY_INITIAL',
+    status: 'DEPLOYED',
+    percentage: 100,
+    environmentCode: 'd1'
 });

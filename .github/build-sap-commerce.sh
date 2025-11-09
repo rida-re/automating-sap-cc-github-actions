@@ -16,12 +16,18 @@ echo "🔧 Environment: $IS_MOCK"
 # Check mock server status if in mock mode
 if [[ "$IS_MOCK" == "mock" ]]; then
     echo "🔍 Checking mock server status..."
-    if curl -s "http://localhost:8080/health" > /dev/null 2>&1; then
-        echo "✅ Mock server is ready"
-    else
-        echo "❌ Mock server is not available"
-        exit 1
-    fi
+    max_retries=10
+    retry_count=0
+    while ! curl -s "http://localhost:8080/health" > /dev/null 2>&1; do
+        if [ $retry_count -ge $max_retries ]; then
+            echo "❌ Mock server is not available after $max_retries attempts"
+            exit 1
+        fi
+        echo "⏳ Waiting for mock server (attempt $((retry_count + 1))/$max_retries)..."
+        retry_count=$((retry_count + 1))
+        sleep 3
+    done
+    echo "✅ Mock server is ready"
 fi
 
 echo "🚀 Starting SAP Commerce build for branch: $branch"

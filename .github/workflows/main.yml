@@ -83,22 +83,51 @@ jobs:
           
           echo "Starting mock server..."
           node server.js > server.log 2>&1 &
+          server_pid=$!
           
           # Wait for the server to start
           echo "⏳ Waiting for mock server to start..."
-          max_attempts=15
+          max_attempts=30
           counter=0
-          while ! curl -s http://localhost:8080/health > /dev/null 2>&1; do
-            if [ $counter -ge $max_attempts ]; then
-              echo "❌ Mock server failed to start in time"
+          server_started=false
+          
+          while [ $counter -lt $max_attempts ]; do
+            if curl -s http://localhost:8080/health > /dev/null 2>&1; then
+              server_started=true
+              echo "✅ Mock server is running"
+              break
+            fi
+            
+            # Check if the server process is still running
+            if ! kill -0 $server_pid 2>/dev/null; then
+              echo "❌ Mock server process died"
               echo "Server log:"
               cat server.log
               exit 1
             fi
-            echo "Attempt $((counter + 1))/$max_attempts: Server not ready yet..."
+            
+            echo "⏳ Waiting for server to be ready (attempt $((counter + 1))/$max_attempts)..."
             counter=$((counter + 1))
-            sleep 2
+            sleep 5
           done
+          
+          if [ "$server_started" != "true" ]; then
+            echo "❌ Mock server failed to start in time"
+            echo "Server log:"
+            cat server.log
+            exit 1
+          fi
+          
+          # Double-check server is responding
+          if ! curl -s http://localhost:8080/health > /dev/null 2>&1; then
+            echo "❌ Mock server health check failed"
+            echo "Server log:"
+            cat server.log
+            exit 1
+          fi
+          
+          # Ensure the mock server is ready for requests
+          sleep 5
 
           echo "api_url=http://localhost:8080" >> $GITHUB_OUTPUT
           echo "✅ Mock SAP CCV2 API running at http://localhost:8080"

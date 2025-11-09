@@ -102,7 +102,23 @@ jobs:
           EOF
 
           # Create health check endpoint
-          echo '{"status": "ok"}' > health.json
+          echo '{"health": [{"status": "ok"}]}' > mock.json
+          # Update mock data to include health check
+          cat <<EOF > mock.json
+          {
+            "health": [
+              {"status": "ok"}
+            ],
+            "subscriptions": {
+              "mock-subscription": {
+                "builds": [],
+                "deployments": []
+              }
+            },
+            "builds": [],
+            "deployments": []
+          }
+          EOF
 
           # Custom middleware for mock server
           cat <<EOF > middleware.js
@@ -130,28 +146,33 @@ jobs:
           }
           EOF
 
-          # Start mock server with middleware and wait for it to be ready
-          json-server --watch mock.json --routes routes.json --middlewares middleware.js --port 8080 > server.log 2>&1 &
-          server_pid=$!
-
+          # Start mock server with middleware
+          echo "Starting mock server..."
+          nohup json-server --watch mock.json --routes routes.json --middlewares middleware.js --port 8080 > server.log 2>&1 &
+          
           # Wait for the server to start
           echo "⏳ Waiting for mock server to start..."
           max_attempts=30
           counter=0
-          while ! curl -s http://localhost:8080/health > /dev/null 2>&1; do
-            if ! ps -p $server_pid > /dev/null; then
-              echo "❌ Mock server process died. Check server.log for details"
-              cat server.log
-              exit 1
+          server_started=false
+          
+          while [ $counter -lt $max_attempts ]; do
+            if curl -s http://localhost:8080/health > /dev/null 2>&1; then
+              server_started=true
+              break
             fi
-            ((counter++))
-            if [ $counter -ge $max_attempts ]; then
-              echo "❌ Mock server failed to start in time"
-              cat server.log
-              exit 1
-            fi
-            sleep 1
+            
+            echo "Attempt $((counter + 1))/$max_attempts: Server not ready yet..."
+            counter=$((counter + 1))
+            sleep 2
           done
+          
+          if [ "$server_started" = false ]; then
+            echo "❌ Mock server failed to start in time"
+            echo "Server log:"
+            cat server.log
+            exit 1
+          fi
 
           echo "api_url=http://localhost:8080" >> $GITHUB_OUTPUT
           echo "✅ Mock SAP CCV2 API running at http://localhost:8080"

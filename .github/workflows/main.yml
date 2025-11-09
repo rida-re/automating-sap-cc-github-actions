@@ -30,6 +30,7 @@ jobs:
           payload='{"branch": "'"${BRANCH_NAME}"'", "name": "'"${BUILD_NAME}"'"}';
           # Use runtime shell variables (BRANCH_NAME and BUILD_NAME) and show payload
           echo "Payload :: $payload"
+          echo "ccv2_build_url :: $ccv2_build_url"
           # Extract raw code string with jq -r so it has no surrounding quotes
           buildcode=$(curl --location --request POST "$ccv2_build_url" --header 'Content-Type: application/json' --header "Authorization: Bearer ${{env.CCV2_AUTH_ACCESS_TOKEN}}" --data-raw "$payload" | jq -r '.code')
           echo "buildcode=$buildcode" >> $GITHUB_ENV

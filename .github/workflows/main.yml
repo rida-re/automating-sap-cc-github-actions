@@ -77,6 +77,7 @@ jobs:
             -Dsonar.projectKey=${{ github.repository_owner }}_cyber-solutions
             -Dsonar.organization=rida
             -Dsonar.sources=.
+            -Dsonar.java.binaries=
             -Dsonar.sourceEncoding=UTF-8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

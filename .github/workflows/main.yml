@@ -77,7 +77,7 @@ jobs:
             -Dsonar.projectKey=${{ github.repository_owner }}_cyber-solutions
             -Dsonar.organization=rida
             -Dsonar.sources=.                   
-            -Dsonar.tests=testsrc
+            -Dsonar.tests=**/testsrc
             -Dsonar.java.binaries=classes
             -Dsonar.binaries=classes
             -Dsonar.inclusions=**/**.java

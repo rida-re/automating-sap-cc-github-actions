@@ -78,7 +78,7 @@ jobs:
             -Dsonar.organization=rida
             -Dsonar.sources=cybersolutionsbackoffice,cybersolutionscommercewebservices,cybersolutionscore,cybersolutionsfacades,cybersolutionsfulfilmentprocess,cybersolutionsinitialdata,cybersolutionsstorefront
             -Dsonar.tests=cybersolutionscommercewebservicestest,cybersolutionstest
-            -Dsonar.java.binaries=classes
+            -Dsonar.java.binaries=cybersolutionscore/build/classes,cybersolutionscommercewebservices/build/classes,cybersolutionsfacades/build/classes,cybersolutionsbackoffice/build/classes
             -Dsonar.binaries=classes
             -Dsonar.inclusions=**/*.java
             -Dsonar.exclusions=**/tomcat.*/**,**/gensrc/**,web/gensrc/**,src/de/hybris/**,web/src/de/hybris/**,**/*Controller.java,**/*Constants.java,**/jalo/**,**/email/context/**,**/*Form*.java,**/*Event*.java,**/*Importer*.java,**/*Factory*.java,**/*Exporter*.java,**/*Producer*.java,**/*CronJob*.java,**/storefront/**,**/*Provider*.java,**/*Converter*.java,**/*Resolver*.java,**/*Action*.java,**/*Job*.java

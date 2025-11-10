@@ -50,14 +50,19 @@ jobs:
           wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.8.0.2856-linux.zip
           unzip sonar-scanner-cli-4.8.0.2856-linux.zip
 
+      - name: Debug directory structure
+        run: |
+          echo "Current directory: $(pwd)"
+          ls -R .
+          
       - name: SonarQube Analysis
         uses: SonarSource/sonarcloud-github-action@v2
         with:
-          projectBaseDir: external_project/bin/custom/cybersolutions
+          projectBaseDir: .
           args: >
             -Dsonar.projectKey=${{ github.repository_owner }}_cyber-solutions
             -Dsonar.organization=${{ github.repository_owner }}
-            -Dsonar.sources=external_project/bin/custom/cybersolutions
+            -Dsonar.sources=src
             -Dsonar.sourceEncoding=UTF-8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

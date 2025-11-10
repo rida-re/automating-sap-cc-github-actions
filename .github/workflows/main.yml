@@ -116,13 +116,11 @@ jobs:
             --exclude "**/*.class"
 
       - name: Upload Security Report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: security-reports
-          path: |
-            **/dependency-check-report.html
-            **/dependency-check-report.json
+          name: build-output
+          path: dist/
 
   SAPCOM_BUILD_AND_DEPLOY_JOB:
     needs: [code-quality, security-scan]

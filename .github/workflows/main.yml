@@ -76,8 +76,13 @@ jobs:
           args: >
             -Dsonar.projectKey=${{ github.repository_owner }}_cyber-solutions
             -Dsonar.organization=rida
-            -Dsonar.sources=.
-            -Dsonar.java.binaries=
+            -Dsonar.sources=.                   
+            -Dsonar.tests=testsrc
+            -Dsonar.java.binaries=classes
+            -Dsonar.binaries=classes
+            -Dsonar.inclusions=**/**.java
+            -Dsonar.exclusions=**/gensrc/**,web/gensrc/**,src/de/hybris/**,web/src/de/hybris/**,**/*Controller.java,**/*Constants.java,**/jalo/**,**/email/context/**,**/*Form*.java,**/*Event*.java,**/*Importer*.java,**/*Factory*.java,**/*Exporter*.java,**/*Producer*.java,**/*CronJob*.java,**/storefront/**,**/*Provider*.java,**/*Converter*.java,**/*Resolver*.java,**/*Action*.java,**/*Job*.java
+            -Dsonar.coverage.exclusions=**/quote/**,**/event/**,**/context/**,**/actions/**,**/core/comparators/**,**/externaltax/**,**/solrfacetsearch/**,**/core/job/*,**/controller/BaseController.java,**/controllers/*,**/core/suggestion/**,**/setup/*,**/facades/storefinder/**,**/facades/populators/**,**/App*.java,**/Acc*.java,**/DefaultC*.java,**/DefaultS*.java,**/Quote*.java
             -Dsonar.sourceEncoding=UTF-8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

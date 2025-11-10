@@ -76,7 +76,7 @@ jobs:
           args: >
             -Dsonar.projectKey=${{ github.repository_owner }}_cyber-solutions
             -Dsonar.organization=rida
-            -Dsonar.sources=.
+            -Dsonar.sources=cybersolutionsbackoffice,cybersolutionscommercewebservices,cybersolutionscore,cybersolutionsfacades,cybersolutionsfulfilmentprocess,cybersolutionsinitialdata,cybersolutionsstorefront
             -Dsonar.tests=cybersolutionscommercewebservicestest,cybersolutionstest
             -Dsonar.java.binaries=classes
             -Dsonar.binaries=classes

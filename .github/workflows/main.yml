@@ -75,7 +75,7 @@ jobs:
           # pass sonar scanner args; sonar.sources is set to '.' because projectBaseDir is the base
           args: >
             -Dsonar.projectKey=${{ github.repository_owner }}_cyber-solutions
-            -Dsonar.organization=${{ github.repository_owner }}
+            -Dsonar.organization=rida
             -Dsonar.sources=.
             -Dsonar.sourceEncoding=UTF-8
         env:
